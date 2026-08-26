@@ -1,0 +1,14 @@
+{
+  "name": "uiq-devtools",
+  "version": "1.0.0",
+  "description": "Interne Analyse-/Wartungswerkzeuge für den UIQ-Suite-Codebestand (axel-scanner, ko-modules, ko-aggregator). Kein Teil der Produktions-App.",
+  "private": true,
+  "scripts": {
+    "backlog19": "node backlog-19-analyse/analyze.js",
+    "backlog19:refine": "node backlog-19-analyse/refine.js"
+  },
+  "dependencies": {
+    "acorn": "^8.15.0",
+    "acorn-walk": "^8.3.4"
+  }
+}
