@@ -5,7 +5,8 @@
   "private": true,
   "scripts": {
     "backlog19": "node backlog-19-analyse/analyze.js",
-    "backlog19:refine": "node backlog-19-analyse/refine.js"
+    "backlog19:refine": "node backlog-19-analyse/refine.js",
+    "ki-prompt-audit": "node ki-prompt-audit/analyze.js"
   },
   "dependencies": {
     "acorn": "^8.15.0",
