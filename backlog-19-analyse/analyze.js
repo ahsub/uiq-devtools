@@ -85,10 +85,20 @@ function readFile(p) {
 function extractInlineScripts(html) {
   // Nur <script>...</script> OHNE src= (die externen sind die gepinnten
   // ko-modules-Dateien, die wir separat vom main-Branch laden).
+  // BUGFIX (29.08.2026, gefunden bei der Entwicklung von
+  // ../ki-prompt-audit/analyze.js): HTML-Kommentare mit Prosa-Text, der
+  // zufaellig "<script"/"</script>"-aehnliche Zeichenfolgen enthaelt (z.B.
+  // Changelog-Kommentare, die ueber Script-Tags SPRECHEN), verwirrten die
+  // reine Regex-Grenzerkennung — ein Block konnte dadurch mehrere echte
+  // <script>-Tags samt Inhalt verschlucken und beim Parsen scheitern, ohne
+  // dass das sichtbar wurde (stiller Coverage-Verlust). Fix: HTML-
+  // Kommentare vor der Extraktion entfernen — sicher, da modernes ES6 keine
+  // HTML-Kommentar-Syntax in Script-Inhalten braucht.
+  const htmlWithoutComments = html.replace(/<!--[\s\S]*?-->/g, "");
   const scripts = [];
   const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi;
   let m, idx = 0;
-  while ((m = re.exec(html)) !== null) {
+  while ((m = re.exec(htmlWithoutComments)) !== null) {
     idx++;
     scripts.push({ file: `index.html#inline-script-${idx}`, code: m[1] });
   }
