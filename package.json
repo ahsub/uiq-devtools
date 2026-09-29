@@ -6,7 +6,8 @@
   "scripts": {
     "backlog19": "node backlog-19-analyse/analyze.js",
     "backlog19:refine": "node backlog-19-analyse/refine.js",
-    "ki-prompt-audit": "node ki-prompt-audit/analyze.js"
+    "ki-prompt-audit": "node ki-prompt-audit/analyze.js",
+    "breadth-divergenz": "python3 breadth-divergenz/analyze.py"
   },
   "dependencies": {
     "acorn": "^8.15.0",

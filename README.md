@@ -172,3 +172,44 @@ npm run ki-prompt-audit    # → ki-prompt-audit/report.md + report.json
   nicht die exakt CDN-gepinnte Version.
 - Ergebnisse sind Kandidatenlisten, keine Bug-Listen — jeder Fund braucht
   manuelle Prüfung.
+
+### `breadth-divergenz/` — Breite-Divergenz & DCE-Konstanz (29.09.2026)
+
+Reproduzierbare Rechnung zu Forschungsnotiz **H6** der Regime-Roadmap
+(`UIQ-Suite/docs/REGIME-BACKTEST-ROADMAP-2026-09-27.md`). Liest das
+Snapshot-Archiv `ko-aggregator/data/snapshots/*.json.gz` und berichtet:
+
+1. **DCE-Konstanz** — Richtung/Ampel/Confidence je Handelstag; Selbsttest,
+   der den gespeicherten DCE-Konsens aus den Tickerdaten exakt nachrechnet
+   (Exit-Code 1 bei Abweichung).
+2. **Index-/Sektor-ETFs** zwischen zwei Stichtagen inkl. Spread SPY − RSP
+   (kapitalgewichtet vs. gleichgewichtet).
+3. **Breite** — Anteil Titel über EMA50/EMA200.
+4. **Sektor-Zerlegung** auf dem gemeinsamen Universum beider Stichtage
+   (Mehrfach-Tags zählen je Tag; Anteil ohne Tag wird ausgewiesen).
+5. **Tagesreihe** aller Handelstage; Werktage ohne Snapshot werden gelistet.
+
+```bash
+npm run breadth-divergenz                       # Standard: SPY-Hoch → letzter Handelstag
+python3 breadth-divergenz/analyze.py --von 2026-08-13 --bis 2026-09-28
+```
+
+Nur Python-Standardbibliothek. Ausgabe `report.md` + `report.json`
+(per `.gitignore` ausgeschlossen). Stichtage sind **Handelstage**
+(`meta.last_trading_day`), nicht Snapshot-Dateinamen; je Handelstag zählt
+der zuletzt erzeugte Snapshot.
+
+**Rein deskriptiv** — kein Renditetest, keine Prognose, keine
+Handlungsempfehlung. Ob Breite-Divergenzen Prognosewert haben, ist H6 und
+wird nur nach Präregistrierung getestet.
+
+#### Bekannte Einschränkungen (Stand 29.09.2026)
+
+- Archiv = rollierendes 90-Tage-Fenster; für H6 viel zu kurz (nur Beschreibung).
+- Universum ändert sich über die Zeit (Admin-Review-Titel) → Breitenwerte
+  zweier Stichtage nur eingeschränkt vergleichbar; Sektor-Zerlegung nutzt
+  deshalb das gemeinsame Universum.
+- ~70 % der Titel ohne Sektor-Tag; robuste Sektorsicht derzeit nur über die
+  GICS-Sektor-ETFs (XL*).
+- Kurse sind Aggregator-Schlusskurse (`price`), keine bereinigte Kursreihe
+  (Dividenden/Splits im Zeitfenster nicht korrigiert).
