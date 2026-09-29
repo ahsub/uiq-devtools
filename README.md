@@ -175,9 +175,10 @@ npm run ki-prompt-audit    # → ki-prompt-audit/report.md + report.json
 
 ### `breadth-divergenz/` — Breite-Divergenz & DCE-Konstanz (29.09.2026)
 
-Reproduzierbare Rechnung zu Forschungsnotiz **H6** der Regime-Roadmap
-(`UIQ-Suite/docs/REGIME-BACKTEST-ROADMAP-2026-09-27.md`). Liest das
-Snapshot-Archiv `ko-aggregator/data/snapshots/*.json.gz` und berichtet:
+Reproduzierbare Rechnung zu Forschungsnotiz **H12** der Regime-Roadmap
+(`UIQ-Suite/docs/REGIME-BACKTEST-ROADMAP-2026-09-27.md`; zunächst als H6
+notiert, umbenannt wegen Kollision mit H6 „TIP-Canary“). Liest das
+Snapshot-Archiv (`*.json.gz`) und berichtet:
 
 1. **DCE-Konstanz** — Richtung/Ampel/Confidence je Handelstag; Selbsttest,
    der den gespeicherten DCE-Konsens aus den Tickerdaten exakt nachrechnet
@@ -192,6 +193,9 @@ Snapshot-Archiv `ko-aggregator/data/snapshots/*.json.gz` und berichtet:
 ```bash
 npm run breadth-divergenz                       # Standard: SPY-Hoch → letzter Handelstag
 python3 breadth-divergenz/analyze.py --von 2026-08-13 --bis 2026-09-28
+
+# ab 29.09.2026: Snapshots liegen nur noch im privaten Repo uiq-archive
+UIQ_SNAPSHOT_DIR=../uiq-archive/data/snapshots npm run breadth-divergenz
 ```
 
 Nur Python-Standardbibliothek. Ausgabe `report.md` + `report.json`
@@ -200,12 +204,14 @@ Nur Python-Standardbibliothek. Ausgabe `report.md` + `report.json`
 der zuletzt erzeugte Snapshot.
 
 **Rein deskriptiv** — kein Renditetest, keine Prognose, keine
-Handlungsempfehlung. Ob Breite-Divergenzen Prognosewert haben, ist H6 und
+Handlungsempfehlung. Ob Breite-Divergenzen Prognosewert haben, ist H12 und
 wird nur nach Präregistrierung getestet.
 
 #### Bekannte Einschränkungen (Stand 29.09.2026)
 
-- Archiv = rollierendes 90-Tage-Fenster; für H6 viel zu kurz (nur Beschreibung).
+- Snapshot-Historie beginnt am 22.07.2026; für H12 viel zu kurz (nur Beschreibung).
+  Seit 29.09.2026 werden Snapshots nicht mehr ins öffentliche `ko-aggregator`
+  committet, sondern nur ins private `uiq-archive` (Befundregister S6).
 - Universum ändert sich über die Zeit (Admin-Review-Titel) → Breitenwerte
   zweier Stichtage nur eingeschränkt vergleichbar; Sektor-Zerlegung nutzt
   deshalb das gemeinsame Universum.

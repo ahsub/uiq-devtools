@@ -2,14 +2,18 @@
 """
 breadth-divergenz/analyze.py — Breite-Divergenz & DCE-Konstanz aus dem Snapshot-Archiv
 
-Version: 1.0.0 (29.09.2026, Claude + Axel)
-Zweck:   Reproduzierbare Rechnung zu Forschungsnotiz H6 (Regime-Roadmap,
+Version: 1.0.1 (29.09.2026, Claude + Axel)
+         1.0.1: H6 → H12 (Umbenennung Roadmap 0fff17f); UIQ_SNAPSHOT_DIR für
+         das private Archiv uiq-archive (Snapshots seit 29.09. nur noch dort).
+Zweck:   Reproduzierbare Rechnung zu Forschungsnotiz H12 (Regime-Roadmap,
          UIQ-Suite/docs/REGIME-BACKTEST-ROADMAP-2026-09-27.md) und zum
          Befund, dass die DCE-Richtung im Archivzeitraum konstant war.
          Rein deskriptiv, read-only, kein Renditetest, keine Signale.
 
-Quelle:  ko-aggregator/data/snapshots/*.json.gz (gzip'd master_market_data,
-         vom Nachtlauf committet, rollierendes 90-Tage-Fenster).
+Quelle:  <snapshot-dir>/*.json.gz (gzip'd master_market_data). Standard:
+         <arbeitsordner>/ko-aggregator/data/snapshots; ab 29.09.2026 liegen
+         neue Snapshots nur noch im privaten Repo uiq-archive →
+         UIQ_SNAPSHOT_DIR=/pfad/zu/uiq-archive/data/snapshots setzen.
 
 Methodik (fest, keine Parameter-Suche):
   * Je Handelstag (meta.last_trading_day) zählt der zuletzt erzeugte
@@ -34,6 +38,7 @@ Methodik (fest, keine Parameter-Suche):
 Nutzung:
     python3 breadth-divergenz/analyze.py [--von YYYY-MM-DD] [--bis YYYY-MM-DD]
     Abweichendes Layout: UIQ_WORKSPACE_ROOT=/pfad python3 ...
+    Privates Archiv:     UIQ_SNAPSHOT_DIR=/pfad/uiq-archive/data/snapshots python3 ...
 Ausgabe: breadth-divergenz/report.md + report.json (per .gitignore
          ausgeschlossen, Wegwerf-Artefakte pro Lauf).
 Abhängigkeiten: nur Python-Standardbibliothek (>= 3.8).
@@ -48,7 +53,7 @@ import statistics
 import sys
 from collections import Counter, defaultdict
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 SCORE_KEYS = ("sMinervini", "sSwing", "sBreakout", "confluenceScore")
 ETFS = [
     ("SPY", "S&P 500 (kapitalgewichtet)"), ("RSP", "S&P 500 (gleichgewichtet)"),
@@ -222,7 +227,7 @@ def main():
     args = ap.parse_args()
 
     root = workspace_root()
-    snap_dir = os.path.join(root, "ko-aggregator", "data", "snapshots")
+    snap_dir = os.environ.get("UIQ_SNAPSHOT_DIR") or os.path.join(root, "ko-aggregator", "data", "snapshots")
     files, per_day, unreadable = load_archive(snap_dir)
     rows = daily_rows(per_day)
     days = [r["trading_day"] for r in rows]
@@ -343,7 +348,7 @@ def main():
                  f"{pct(r['share_above_ema50'])} | {pct(r['share_above_ema200'])} | {r['spy']} | {r['rsp']} | {r['regime']} |")
 
     L.append("\n---\nRein deskriptiv. Keine Prognose, kein Renditetest, keine Handlungsempfehlung. "
-             "Ob eine Breite-Divergenz Prognosewert hat, ist Gegenstand von H6 (Regime-Roadmap) "
+             "Ob eine Breite-Divergenz Prognosewert hat, ist Gegenstand von H12 (Regime-Roadmap) "
              "und nur nach Präregistrierung zu testen.")
 
     here = os.path.dirname(os.path.abspath(__file__))
