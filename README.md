@@ -1,221 +1,80 @@
-# uiq-devtools
+# survivorship_gap.py (v1.1.1)
 
-Interne Analyse-Werkzeuge für den UIQ-Suite-Codebestand. Kein Teil der
-Produktions-App, kein Deployment-Ziel — reines Entwickler-Werkzeug für
-Axel/Claude-Sessions.
+Misst, wie groß die Survivorship-Lücke wäre, wenn ein **heutiges** US-Aktienuniversum rückwärts für Backtests verwendet wird. Datenquelle: Alpha Vantage `LISTING_STATUS` (Listings zu einem Stichtag plus Liste aller delisteten Titel). Optional wird zusätzlich eine **Large-Cap-Kennzahl** über eine Indexmitgliedschafts-Datei berechnet.
 
-## Enthalten
+Hintergrund: SUITE-Backlog „Quellenbasierte Regelwerke“, Methodik A.5 und Reihenfolge F.2 (Universum klären, bevor große Backtests laufen).
 
-### `backlog-19-analyse/` — Statisches Analyse-Skript zu SUITE.md Backlog Punkt 19
-
-Entstanden am 26.08.2026 als Reaktion auf den VIX-Datenkonsistenz-Bug vom
-25.08.2026 (zwei unabhängige Pipelines schrieben unkoordiniert denselben
-Wert in dasselbe DOM-Element). Backlog Punkt 19 (SUITE.md) fordert ein
-Werkzeug, das solche Muster systematisch statt zufällig findet.
-
-Prüft `axel-scanner/index.html` + `ko-modules/*.js` + `ko-aggregator/workers/**/*.js`
-auf drei Bug-Klassen:
-
-1. **Funktionsaufrufe vs. echte Aufrufstellen** — definierte Funktionen ohne
-   jeden Aufruf-Nachweis (toter Code) und Aufrufe ohne Definition (Tippfehler,
-   Ladereihenfolge-Probleme).
-2. **`getElementById()` vs. echte IDs** — verwaiste DOM-Referenzen, und
-   (verfeinert in `refine.js`) IDs, auf die mehrere **automatisch erreichbare**
-   Funktionen unkoordiniert schreiben — das eigentliche VIX-Bug-Muster.
-3. **Duplizierte Funktionskörper** — identische Funktionen an mehreren
-   Stellen (wie die vier duplizierten Ampel-Renderer vom 14.07.2026).
-
-#### Nutzung
-
-Erwartetes Verzeichnis-Layout — dieses Repo liegt als Geschwister-Ordner
-neben den zu analysierenden Repos in einem gemeinsamen Arbeitsordner:
-
-```
-irgendein-arbeitsordner/
-├── axel-scanner/
-├── ko-modules/
-├── ko-aggregator/
-└── uiq-devtools/          ← dieses Repo
-```
+## Aufruf
 
 ```bash
-cd uiq-devtools
-npm install
-npm run backlog19          # → backlog-19-analyse/report.md + report.json
-npm run backlog19:refine   # → backlog-19-analyse/report-2c.md + report-2c.json
+export ALPHA_VANTAGE_KEY=...          # bestehender UIQ-Key
+python3 survivorship_gap.py                                    # Gesamtmarkt, SPAC-Filter an
+python3 survivorship_gap.py --index-members sp500_history.csv  # + Large-Cap-Kennzahl
+python3 survivorship_gap.py --uiq-universe uiq_us_tickers.txt  # + Abgleich UIQ-Universum
+python3 survivorship_gap.py --include-spacs                    # Vergleich wie v1.0
+python3 survivorship_gap.py --offline                          # nur aus dem Cache
 ```
 
-Abweichendes Layout: `UIQ_WORKSPACE_ROOT=/pfad/zum/arbeitsordner npm run backlog19`
+- **API-Verbrauch:** 2 + Anzahl Stichtage (Standard: 6 Aufrufe), mit 15 s Pause zwischen den Aufrufen.
+- **Cache:** Rohdaten liegen in `survivorship_cache/` (kompatibel mit v1.0). Weitere Läufe mit anderen Optionen kosten keine Aufrufe.
+- **Abhängigkeiten:** nur die Python-Standardbibliothek.
 
-Reports werden lokal neben den Skripten erzeugt und sind per `.gitignore`
-ausgeschlossen (Wegwerf-Artefakte pro Lauf, kein Commit-Ziel).
+## Indexmitgliedschafts-Datei (`--index-members`)
 
-#### Bekannte Einschränkungen (Stand 26.08.2026)
+Zwei Formate werden automatisch erkannt:
 
-- **`ko-modules` wird im main-Branch-Stand analysiert, nicht in den
-  CDN-gepinnten Versionen**, die `index.html` tatsächlich per
-  `jsdelivr@<commit-hash>` lädt. Bei Abweichung zwischen Pin und main
-  können Treffer falsch sein. Das Skript listet die gefundenen Pins im
-  Report-Kopf zur manuellen Gegenprüfung.
-- **Dynamisch per `innerHTML`/Template erzeugte IDs** werden nicht erkannt
-  (keine DOM-Ausführung, nur statische Textsuche) — Treffer in Abschnitt 2a
-  können falsch-positiv sein.
-- **Namensbasierter Call-Graph, nicht scope-exakt** — Methodennamen auf
-  verschiedenen Objekten mit demselben Namen werden zusammengeworfen.
-- **TODO / bekannte Lücke aus der ersten Anwendung (26.08.2026):**
-  `refine.js`s Automatik-Erkennung ist **branch-unsensitiv** bei
-  Dispatcher-Funktionen. Beispiel: `showPanel(id)` wird einmalig beim
-  Seitenladen automatisch aufgerufen (`showPanel('home')`), wodurch das
-  Skript **alle** Aufrufe irgendwo im `showPanel`-Körper als "automatisch
-  erreichbar" markiert — auch die, die nur in einem `if(id==='makro')`-
-  o.ä. Zweig stehen, der beim Boot-Aufruf gar nicht durchlaufen wird und
-  in der Praxis nur bei Nutzer-Klick auf den jeweiligen Tab läuft. Das
-  erzeugte in der ersten Anwendung ca. 12 falsch-positive Kollisions-
-  kandidaten. Eine zukünftige Version müsste den Aufruf-Kontext
-  argumentsensitiv (welcher `if(id===X)`-Zweig aktiv ist) statt nur
-  namensbasiert verfolgen, um diese Klasse von Fehlalarmen zu vermeiden.
-  Bis dahin: jeder §2c-Treffer aus `showPanel`-artigen Dispatchern manuell
-  gegenprüfen, bevor er als echter Kandidat gilt.
-- Ergebnisse sind **Kandidatenlisten, keine Bug-Listen** — jeder Fund
-  braucht manuelle Prüfung vor jeder Fix-Entscheidung (siehe SUITE.md
-  Backlog Punkt 19, Grundsatz: Vollständigkeit ist bei dieser Codegröße
-  nicht erreichbar, systematisches Suchen ersetzt kein Verständnis).
+**A) Zeiträume**
+```
+symbol,start_date,end_date
+XXX,2005-06-01,
+YYY,2010-02-16,2018-03-19
+```
+`end_date` bleibt leer, wenn der Titel noch Mitglied ist.
 
-#### Historie
+**B) Snapshots**
+```
+date,tickers
+2014-01-02,"XXX,YYY,ZZZ"
+```
+Für jeden Stichtag wird der letzte Snapshot davor verwendet. Datum `YYYY-MM-DD` oder `MM/DD/YYYY`.
 
-#### Historie
+Symbole werden normalisiert (`.` und `/` werden zu `-`), passend zur Schreibweise von Alpha Vantage.
 
-- 29.08.2026: `extractInlineScripts()` gefixt (HTML-Kommentar-Stripping vor
-  Script-Extraktion, s. `ki-prompt-audit/`-Historie unten für die volle
-  Herleitung) — behebt stillen Coverage-Verlust bei Blöcken, die durch
-  Prosa-Kommentare mit script-artigem Text fehlklassifiziert wurden.
-- 26.08.2026: Erste Version + erste Anwendung. Ergebnis siehe SUITE.md
-  Backlog №57 (renderHomeLanding-Altcode) und №58
-  (kvToScannerState/loadScannerFromKV-Fallback-Sync-Hinweis). Kein zweiter
-  VIX-Klon gefunden; alle anderen Kandidaten als Fehlalarme erklärt
-  (bewusste Fallback-Ketten oder Dispatcher-Branch-Unsensitivität, siehe
-  oben).
+**Mögliche Quellen** (nicht im Repo ablegen, enthalten Ticker):
+- öffentlich gepflegte GitHub-Listen der historischen S&P-500-Zusammensetzung, meist im Snapshot-Format B;
+- die kostenlose S&P-500-Stufe von Valuein (Herstellerangabe: aktuelle und frühere Mitglieder), umgewandelt in Format A.
 
-### `ki-prompt-audit/` — Statisches Analyse-Skript zu HVP/IVR-Label-Bug (29.08.2026)
+Vor der Nutzung lohnt sich eine Stichprobe gegen eine zweite Quelle. Rekonstruierte Listen enthalten für ältere Jahre oft weniger als 500 Mitglieder; der Bericht warnt dann (Schwelle über `--expected-members`, Standard 500). Die Spalte „nicht in AV-Liste damals“ im Bericht dient als Plausibilitätsprüfung.
 
-Entstanden als Reaktion auf den HVP/IVR-Label-Bug (Legal-Review-Zyklus 4/5,
-SUITE.md Backlog №65/№68): das Label-Präfix `"IVR:"` war in
-`runOptionsKiBriefing()` fest verdrahtet, auch im HVP-Fallback-Zweig — der
-an die KI gesendete Prompt-Text enthielt dadurch wörtlich `"IVR:HVP96%"`
-(zwei Indikator-Namen unaufgelöst im selben Feld). Die KI hat das im Output
-korrekt zitiert — kein Sprachfehler der KI, sondern ein
-Daten-Serialisierungs-Bug. Ein zweiter, unabhängiger Fundort derselben
-Logik (`runBestOptionsOpportunityKI()`) wurde erst durch gezielte Nachsuche
-gefunden, nicht durch den ersten Fix — genau das Muster, das dieses Skript
-künftig systematisch statt zufällig finden soll.
+## Ausgabe
 
-Prüft `axel-scanner/index.html` + `ko-modules/*.js` (AST-basiert via
-`acorn`, nicht Regex) auf:
+| Datei | Inhalt | Committen? |
+|---|---|---|
+| `survivorship_out/survivorship_report_JJJJ-MM-TT.md` | Zählwerte: Gesamtmarkt, Large Caps, nach Börse, nach Jahr, UIQ-Abgleich | ja (ticker-frei) |
+| `survivorship_out/detail_*.csv`, `detail_index_*.csv` | Symbol-Ebene | **nein** |
+| `survivorship_cache/*.csv` | Rohdaten von Alpha Vantage | **nein** |
 
-1. **KI-Prompt-Aufrufstellen-Katalog** — vollständige Liste aller
-   `koAiCall(...)`/`KoPrompts.get(...)`-Aufrufe mit Datei, Zeile,
-   umschließender Funktion und Action-/Strategie-Name. Dient als Checkliste
-   für UIQ-REGULATORY-LANGUAGE-SPEC.md §6 (Modul-Rollout-Status) und für
-   künftige Begriffs-/Kausalitäts-Integritäts-Prüfungen (Spec §1.3/§1.4).
-2. **Doppel-Label-Fallback-Muster** — findet Ausdrücke der Form
-   `'LABEL1:' + (a.feldA != null ? ... : (a.feldB ? 'LABEL2' + ... : '--'))`,
-   bei denen ein fest verdrahtetes äußeres Label mit einem abweichenden
-   inneren Label im Fallback-Zweig kollidiert — exakt die Bug-Signatur vom
-   29.08.2026.
-
-#### Nutzung
-
-Gleiches Verzeichnis-Layout wie `backlog-19-analyse/` (s.o.).
-
-```bash
-cd uiq-devtools
-npm install
-npm run ki-prompt-audit    # → ki-prompt-audit/report.md + report.json
+`.gitignore`:
+```
+survivorship_cache/
+survivorship_out/detail_*.csv
 ```
 
-#### Verifikation (29.08.2026, vor erstem produktiven Einsatz)
+## Kategorien
 
-- **True-Positive-Test:** synthetische Datei mit dem exakten Bug-Muster
-  gebaut — vom Skript korrekt gefunden, nachdem ein erster Implementierungs-
-  fehler (Label-Erkennung griff nicht bei verschachtelten `+`-Ketten wie
-  `a + 'IVR:' + (...)`, da linksassoziative Verkettung das Literal nicht
-  direkt in `node.left` sondern im rechtesten Blatt der `node.left`-Teilkette
-  platziert) behoben wurde.
-- **Regressionstest gegen echten, bereits gefixten Code:** 0 Funde — beide
-  bekannten Bugs (inkl. des zweiten, hier erst entdeckten Fundorts in
-  `runBestOptionsOpportunityKI()`) sind behoben, keine dritte Stelle
-  gefunden.
-- **Extraktions-Bug während der Verifikation gefunden+behoben:** die
-  wiederverwendete `extractInlineScripts()`-Funktion (identisch zu
-  `backlog-19-analyse/analyze.js`) scheiterte an HTML-Kommentaren, deren
-  Prosa-Text zufällig `<script`/`</script>`-ähnliche Zeichenfolgen enthält
-  (z.B. Changelog-Kommentare, die über Script-Tags *sprechen*) — ein
-  92-KB-Block mit echten `KoPrompts.get(...)`-Aufrufen wurde dadurch
-  komplett übersprungen, ohne dass ein Fehler das sichtbar gemacht hätte.
-  Fix hier: HTML-Kommentare vor der Extraktion entfernen. **Diese
-  Einschränkung besteht vermutlich unverändert in
-  `backlog-19-analyse/analyze.js`** (dort noch nicht nachgezogen) — bei
-  nächster Gelegenheit dort ebenfalls beheben.
-- **Ground-Truth-Abgleich:** 18 gefundene Aufrufstellen manuell gegen eine
-  einfache String-Suche gegengeprüft (unter Ausschluss von Kommentar-/
-  JSDoc-Vorkommen) — exakte Übereinstimmung.
+- **überlebt:** heute unter demselben Symbol gelistet, und das Unternehmen ist dasselbe (Börsengang nicht nach dem Stichtag)
+- **delistet:** laut Delisted-Liste nach dem Stichtag eingestellt
+- **Symbol neu vergeben:** Das Symbol ist heute gelistet, gehört aber einem Unternehmen mit Börsengang nach dem Stichtag.
+- **ungeklärt:** fehlt heute, ohne Eintrag in der Delisted-Liste (meist Symbolwechsel)
 
-#### Bekannte Einschränkungen
+Zusätzlich bei Large Caps:
+- **Lücke (Listing):** damalige Indexmitglieder, die heute nicht mehr gelistet sind
+- **Lücke (Index):** damalige Indexmitglieder, die heute nicht mehr im Index sind. Relevant für Backtests auf der heutigen Indexliste.
 
-- Erkennt nur Binärkonkatenation (`'X:' + (...)`), keine Template-Strings
-  (`` `X:${...}` ``).
-- Erkennt keine Label-Konflikte, die über mehrere Funktionsaufrufe verteilt
-  sind (z.B. Label in einer Hilfsfunktion, Fallback-Wert im Aufrufer).
-- Funktionszuordnung ist grob (nächste umschließende benannte Funktion),
-  nicht scope-exakt.
-- Wie `backlog-19-analyse/`: analysiert `ko-modules` im main-Branch-Stand,
-  nicht die exakt CDN-gepinnte Version.
-- Ergebnisse sind Kandidatenlisten, keine Bug-Listen — jeder Fund braucht
-  manuelle Prüfung.
+## Grenzen
 
-### `breadth-divergenz/` — Breite-Divergenz & DCE-Konstanz (29.09.2026)
-
-Reproduzierbare Rechnung zu Forschungsnotiz **H12** der Regime-Roadmap
-(`UIQ-Suite/docs/REGIME-BACKTEST-ROADMAP-2026-09-27.md`; zunächst als H6
-notiert, umbenannt wegen Kollision mit H6 „TIP-Canary“). Liest das
-Snapshot-Archiv (`*.json.gz`) und berichtet:
-
-1. **DCE-Konstanz** — Richtung/Ampel/Confidence je Handelstag; Selbsttest,
-   der den gespeicherten DCE-Konsens aus den Tickerdaten exakt nachrechnet
-   (Exit-Code 1 bei Abweichung).
-2. **Index-/Sektor-ETFs** zwischen zwei Stichtagen inkl. Spread SPY − RSP
-   (kapitalgewichtet vs. gleichgewichtet).
-3. **Breite** — Anteil Titel über EMA50/EMA200.
-4. **Sektor-Zerlegung** auf dem gemeinsamen Universum beider Stichtage
-   (Mehrfach-Tags zählen je Tag; Anteil ohne Tag wird ausgewiesen).
-5. **Tagesreihe** aller Handelstage; Werktage ohne Snapshot werden gelistet.
-
-```bash
-npm run breadth-divergenz                       # Standard: SPY-Hoch → letzter Handelstag
-python3 breadth-divergenz/analyze.py --von 2026-08-13 --bis 2026-09-28
-
-# ab 29.09.2026: Snapshots liegen nur noch im privaten Repo uiq-archive
-UIQ_SNAPSHOT_DIR=../uiq-archive/data/snapshots npm run breadth-divergenz
-```
-
-Nur Python-Standardbibliothek. Ausgabe `report.md` + `report.json`
-(per `.gitignore` ausgeschlossen). Stichtage sind **Handelstage**
-(`meta.last_trading_day`), nicht Snapshot-Dateinamen; je Handelstag zählt
-der zuletzt erzeugte Snapshot.
-
-**Rein deskriptiv** — kein Renditetest, keine Prognose, keine
-Handlungsempfehlung. Ob Breite-Divergenzen Prognosewert haben, ist H12 und
-wird nur nach Präregistrierung getestet.
-
-#### Bekannte Einschränkungen (Stand 29.09.2026)
-
-- Snapshot-Historie beginnt am 22.07.2026; für H12 viel zu kurz (nur Beschreibung).
-  Seit 29.09.2026 werden Snapshots nicht mehr ins öffentliche `ko-aggregator`
-  committet, sondern nur ins private `uiq-archive` (Befundregister S6).
-- Universum ändert sich über die Zeit (Admin-Review-Titel) → Breitenwerte
-  zweier Stichtage nur eingeschränkt vergleichbar; Sektor-Zerlegung nutzt
-  deshalb das gemeinsame Universum.
-- ~70 % der Titel ohne Sektor-Tag; robuste Sektorsicht derzeit nur über die
-  GICS-Sektor-ETFs (XL*).
-- Kurse sind Aggregator-Schlusskurse (`price`), keine bereinigte Kursreihe
-  (Dividenden/Splits im Zeitfenster nicht korrigiert).
+- Nur USA. Die Delisting-Gründe sind nicht unterscheidbar: Übernahmen zählen genauso wie Insolvenzen.
+- Die Gesamtmarkt-Zahl ist für das Large-Cap-Universum von UIQ eine **Obergrenze**. Passender ist die Indexkennzahl.
+- **SPAC-Filter:** Namensheuristik („Acquisition Corp“, „Blank Check“, „Merger Corp“, Serien mit römischer Nummer am Namensende). Fehlklassifikationen sind möglich. Für die Indexanalyse ist der Filter bewusst abgeschaltet.
+- Die Stammaktien-Heuristik (Gesamtmarkt) schließt Symbole mit `-` oder `.` aus. Für die Indexanalyse ist sie abgeschaltet.
+- Stichtage werden laut Alpha Vantage erst ab 2010 unterstützt.
